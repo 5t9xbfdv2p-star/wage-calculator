@@ -24,6 +24,7 @@
       --money: #34d399;
       --money-bg: #0c1f1a;
       --money-border: #1f6b4f;
+      color-scheme: dark;
     }
     * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
     html, body { height: 100%; }
@@ -33,7 +34,7 @@
       font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
       color: var(--text);
       display: flex;
-      align-items: center;
+      align-items: flex-start;
       justify-content: center;
       padding: 24px;
       padding-top: calc(24px + env(safe-area-inset-top));
@@ -52,7 +53,7 @@
     .field { margin-bottom: 16px; }
     label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
     .hint { font-weight: 400; color: var(--muted); font-size: 12px; }
-    input {
+    input, select {
       width: 100%;
       padding: 12px 14px;
       font-size: 16px;
@@ -63,14 +64,14 @@
       color: var(--text);
       transition: border-color 0.15s, box-shadow 0.15s;
     }
-    input:focus {
+    input:focus, select:focus {
       border-color: var(--accent);
       box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
     }
-    input[type="time"]::-webkit-calendar-picker-indicator,
-    input[type="time"]::-webkit-date-and-time-value { filter: invert(0.8); }
-    .row { display: flex; gap: 14px; }
-    .row .field { flex: 1; }
+    .days-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 14px; }
+    .day label { font-size: 13px; font-weight: 600; margin-bottom: 4px; color: var(--muted); }
+    .checkbox-field label { display: flex; align-items: flex-start; gap: 10px; font-weight: 400; font-size: 14px; color: var(--text); cursor: pointer; line-height: 1.4; }
+    .checkbox-field input[type="checkbox"] { width: 18px; height: 18px; flex: none; margin-top: 1px; accent-color: var(--accent); }
     .result {
       margin-top: 6px;
       background: var(--money-bg);
@@ -82,46 +83,15 @@
     .result .label { color: var(--muted); font-size: 14px; }
     .result .value { font-size: 20px; font-weight: 700; color: var(--money); }
     .result .value.big { font-size: 26px; }
-    .error { margin-top: 12px; color: #f87171; font-size: 14px; min-height: 20px; }
-    select {
-      width: 100%;
-      padding: 12px 14px;
-      font-size: 16px;
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      outline: none;
-      background: var(--input);
-      color: var(--text);
-      color-scheme: dark;
-      transition: border-color 0.15s, box-shadow 0.15s;
-    }
-    select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18); }
-    .checkbox-field label { display: flex; align-items: flex-start; gap: 10px; font-weight: 400; font-size: 14px; color: var(--text); cursor: pointer; line-height: 1.4; }
-    .checkbox-field input[type="checkbox"] { width: 18px; height: 18px; flex: none; margin-top: 1px; accent-color: var(--accent); }
     .note { color: var(--muted); font-size: 12px; margin: 12px 0 0; line-height: 1.5; }
     .divider { border: none; border-top: 1px solid var(--border); margin: 12px 0 10px; }
+    .error { margin-top: 12px; color: #f87171; font-size: 14px; min-height: 20px; }
   </style>
 </head>
 <body>
   <div class="card">
     <h1>工资计算</h1>
-    <p class="subtitle">计算实际工时与税前工资</p>
-
-    <div class="row">
-      <div class="field">
-        <label for="start">上班时间</label>
-        <input type="time" id="start" value="11:00">
-      </div>
-      <div class="field">
-        <label for="end">下班时间</label>
-        <input type="time" id="end" value="20:30">
-      </div>
-    </div>
-
-    <div class="field">
-      <label for="breakMin">无薪休息时间 <span class="hint">（分钟）</span></label>
-      <input type="number" id="breakMin" min="0" step="1" value="30" inputmode="numeric">
-    </div>
+    <p class="subtitle">每周 / 两周税后工资估算</p>
 
     <div class="field">
       <label for="rate">时薪 <span class="hint">（澳元 / 小时）</span></label>
@@ -129,8 +99,13 @@
     </div>
 
     <div class="field">
-      <label for="weeklyHours">每周工作时长 <span class="hint">（小时，用于估算年收入）</span></label>
-      <input type="number" id="weeklyHours" min="0" step="1" value="20" inputmode="numeric">
+      <label for="days">每周工作天数</label>
+      <input type="number" id="days" min="1" max="7" step="1" value="3" inputmode="numeric">
+    </div>
+
+    <div class="field">
+      <label>每天工作时长 <span class="hint">（小时）</span></label>
+      <div class="days-grid" id="daysGrid"></div>
     </div>
 
     <div class="field">
@@ -150,23 +125,23 @@
 
     <div class="result">
       <div class="line">
-        <span class="label">实际工时</span>
+        <span class="label">本周工时</span>
         <span class="value" id="hoursOut">—</span>
       </div>
       <div class="line">
-        <span class="label">税前工资</span>
-        <span class="value" id="wageOut">—</span>
+        <span class="label">每周税前</span>
+        <span class="value" id="grossOut">—</span>
       </div>
       <hr class="divider">
       <div class="line">
-        <span class="label">估算税额</span>
-        <span class="value" id="taxOut">—</span>
+        <span class="label">每周税后</span>
+        <span class="value big" id="weeklyNet">—</span>
       </div>
       <div class="line">
-        <span class="label">税后工资</span>
-        <span class="value big" id="netOut">—</span>
+        <span class="label">两周税后</span>
+        <span class="value big" id="fortnightNet">—</span>
       </div>
-      <p class="note" id="taxNote"></p>
+      <p class="note" id="note"></p>
     </div>
 
     <p class="error" id="error"></p>
@@ -174,7 +149,7 @@
 
   <script>
     const $ = (id) => document.getElementById(id);
-    function toMinutes(t) { const [h, m] = t.split(':').map(Number); return h * 60 + m; }
+    const DAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
 
     // 2025–26 澳洲税务居民所得税（含低收入抵免 LITO）
     function residentTax(income) {
@@ -199,56 +174,98 @@
       return 60850 + (income - 190000) * 0.45;
     }
 
-    function calc() {
-      const start = $('start').value, end = $('end').value;
-      const breakMin = parseFloat($('breakMin').value);
-      const rate = parseFloat($('rate').value);
-      const weeklyHours = parseFloat($('weeklyHours').value);
-      const resident = $('residency').value === 'resident';
-      const medicareExempt = $('medicareExempt').checked;
-      const err = $('error'); err.textContent = '';
+    // 构建 7 天的工时输入框（一次构建，靠显隐切换，保留已填值）
+    const grid = $('daysGrid');
+    DAYS.forEach((name) => {
+      const d = document.createElement('div');
+      d.className = 'day';
+      const label = document.createElement('label');
+      label.textContent = name;
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.min = '0';
+      input.step = '0.5';
+      input.placeholder = '0';
+      input.inputMode = 'decimal';
+      d.appendChild(label);
+      d.appendChild(input);
+      grid.appendChild(d);
+    });
 
-      $('medicareRow').style.display = resident ? '' : 'none';
-
-      if (!start || !end) {
-        $('hoursOut').textContent = '—'; $('wageOut').textContent = '—';
-        $('taxOut').textContent = '—'; $('netOut').textContent = '—';
-        $('taxNote').textContent = '';
-        err.textContent = '请填写上班时间和下班时间。';
-        return;
-      }
-      if (isNaN(breakMin) || breakMin < 0) { err.textContent = '休息分钟数无效。'; return; }
-      if (isNaN(rate) || rate < 0) { err.textContent = '时薪无效。'; return; }
-
-      let diff = toMinutes(end) - toMinutes(start);
-      if (diff <= 0) diff += 24 * 60;
-      const workMin = Math.max(0, diff - breakMin);
-      const hours = workMin / 60;
-      const gross = hours * rate;
-
-      $('hoursOut').textContent = hours.toFixed(2) + ' 小时';
-      $('wageOut').textContent = 'A$' + gross.toFixed(2);
-
-      // 估算税后工资：按年收入套用累进税率，再折算到本班次
-      const wh = (isNaN(weeklyHours) || weeklyHours < 0) ? 0 : weeklyHours;
-      const annual = rate * wh * 52;
-      let annualTax = resident ? residentTax(annual) : foreignTax(annual);
-      if (resident && !medicareExempt) annualTax += annual * 0.02;
-      const effRate = annual > 0 ? annualTax / annual : 0;
-      const shiftTax = gross * effRate;
-      const net = gross - shiftTax;
-
-      $('taxOut').textContent = 'A$' + shiftTax.toFixed(2);
-      $('netOut').textContent = 'A$' + net.toFixed(2);
-      const label = resident ? '澳洲税务居民' : '非居民';
-      const medicareNote = (resident && !medicareExempt) ? '，含 2% Medicare' : '';
-      $('taxNote').textContent = '按年收入约 A$' + annual.toFixed(0) + '（每周 ' + wh + ' 小时 × 52 周）' + medicareNote + '，以「' + label + '」估算，仅供参考，实际以 ATO 为准。';
+    function updateDays() {
+      let n = parseInt($('days').value, 10);
+      if (isNaN(n)) n = 1;
+      n = Math.min(7, Math.max(1, n));
+      $('days').value = n;
+      grid.querySelectorAll('.day').forEach((d, i) => {
+        d.style.display = i < n ? '' : 'none';
+      });
+      calc();
     }
 
-    ['start', 'end', 'breakMin', 'rate', 'weeklyHours'].forEach(id => $(id).addEventListener('input', calc));
+    function calc() {
+      const rate = parseFloat($('rate').value);
+      const resident = $('residency').value === 'resident';
+      const medicareExempt = $('medicareExempt').checked;
+      const err = $('error');
+      err.textContent = '';
+      $('medicareRow').style.display = resident ? '' : 'none';
+
+      if (isNaN(rate) || rate < 0) {
+        err.textContent = '时薪无效。';
+        $('hoursOut').textContent = '—';
+        $('grossOut').textContent = '—';
+        $('weeklyNet').textContent = '—';
+        $('fortnightNet').textContent = '—';
+        $('note').textContent = '';
+        return;
+      }
+
+      let totalHours = 0, workDays = 0;
+      grid.querySelectorAll('.day').forEach((d) => {
+        if (d.style.display === 'none') return;
+        const h = parseFloat(d.querySelector('input').value) || 0;
+        totalHours += h;
+        if (h > 0) workDays++;
+      });
+
+      if (totalHours <= 0) {
+        $('hoursOut').textContent = '—';
+        $('grossOut').textContent = 'A$0.00';
+        $('weeklyNet').textContent = 'A$0.00';
+        $('fortnightNet').textContent = 'A$0.00';
+        $('note').textContent = '请在上方填写每天的工作时长（小时）。';
+        return;
+      }
+
+      const weeklyGross = totalHours * rate;
+      const fortnightGross = weeklyGross * 2;
+      const annual = weeklyGross * 52;
+
+      let annualTax = resident ? residentTax(annual) : foreignTax(annual);
+      if (resident && !medicareExempt) annualTax += annual * 0.02;
+      const eff = annual > 0 ? annualTax / annual : 0;
+      const weeklyNet = weeklyGross * (1 - eff);
+      const fortnightNet = fortnightGross * (1 - eff);
+
+      $('hoursOut').textContent = workDays + ' 天 · ' + totalHours.toFixed(1) + ' 小时';
+      $('grossOut').textContent = 'A$' + weeklyGross.toFixed(2);
+      $('weeklyNet').textContent = 'A$' + weeklyNet.toFixed(2);
+      $('fortnightNet').textContent = 'A$' + fortnightNet.toFixed(2);
+
+      const label = resident ? '澳洲税务居民' : '非居民';
+      const medicareNote = (resident && !medicareExempt) ? '，含 2% Medicare' : '';
+      $('note').textContent = '按年收入约 A$' + annual.toFixed(0) + '（每周 ' + totalHours.toFixed(1) + ' 小时 × 52 周）' + medicareNote + '，以「' + label + '」估算，仅供参考，实际以 ATO 为准。';
+    }
+
+    $('rate').addEventListener('input', calc);
+    $('days').addEventListener('input', updateDays);
     $('residency').addEventListener('change', calc);
     $('medicareExempt').addEventListener('change', calc);
-    calc();
+    grid.addEventListener('input', calc);
+
+    updateDays();
+
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));
     }

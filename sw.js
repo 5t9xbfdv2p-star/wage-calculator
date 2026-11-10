@@ -1,4 +1,4 @@
-const CACHE = 'wage-calculator-v2';
+const CACHE = 'wage-calculator-v3';
 const ASSETS = [
   './',
   './index.html',
@@ -22,20 +22,18 @@ self.addEventListener('activate', (e) => {
   );
 });
 
+// 网络优先：保证页面更新能及时生效，离线时回退到缓存
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
   e.respondWith(
-    caches.match(e.request).then((cached) => {
-      const network = fetch(e.request)
-        .then((resp) => {
-          if (resp && resp.status === 200 && resp.type === 'basic') {
-            const clone = resp.clone();
-            caches.open(CACHE).then((c) => c.put(e.request, clone));
-          }
-          return resp;
-        })
-        .catch(() => cached);
-      return cached || network;
-    })
+    fetch(e.request)
+      .then((resp) => {
+        if (resp && resp.status === 200 && resp.type === 'basic') {
+          const clone = resp.clone();
+          caches.open(CACHE).then((c) => c.put(e.request, clone));
+        }
+        return resp;
+      })
+      .catch(() => caches.match(e.request))
   );
 });
