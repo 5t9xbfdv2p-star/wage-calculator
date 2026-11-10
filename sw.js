@@ -1,4 +1,4 @@
-const CACHE = 'wage-calculator-v1';
+const CACHE = 'wage-calculator-v2';
 const ASSETS = [
   './',
   './index.html',
