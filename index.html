@@ -192,11 +192,13 @@
       grid.appendChild(d);
     });
 
-    function updateDays() {
-      let n = parseInt($('days').value, 10);
-      if (isNaN(n)) n = 1;
-      n = Math.min(7, Math.max(1, n));
-      $('days').value = n;
+    function daysCount() {
+      const n = parseInt($('days').value, 10);
+      if (isNaN(n)) return 1;
+      return Math.min(7, Math.max(1, n));
+    }
+
+    function applyDays(n) {
       grid.querySelectorAll('.day').forEach((d, i) => {
         d.style.display = i < n ? '' : 'none';
       });
@@ -259,12 +261,18 @@
     }
 
     $('rate').addEventListener('input', calc);
-    $('days').addEventListener('input', updateDays);
+    $('days').addEventListener('input', () => applyDays(daysCount()));
+    $('days').addEventListener('change', () => {
+      const n = daysCount();
+      $('days').value = n;
+      applyDays(n);
+    });
+    $('days').addEventListener('focus', (e) => e.target.select());
     $('residency').addEventListener('change', calc);
     $('medicareExempt').addEventListener('change', calc);
     grid.addEventListener('input', calc);
 
-    updateDays();
+    applyDays(daysCount());
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));
