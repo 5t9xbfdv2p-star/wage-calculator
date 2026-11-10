@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>工资计算</title>
+  <meta name="theme-color" content="#0f1115">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="工资计算">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <style>
+    :root {
+      --bg: #0f1115;
+      --card: #1a1d24;
+      --input: #12151b;
+      --text: #e6e8ec;
+      --muted: #9aa0aa;
+      --accent: #3b82f6;
+      --border: #2a2f3a;
+      --money: #34d399;
+      --money-bg: #0c1f1a;
+      --money-border: #1f6b4f;
+    }
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      padding-top: calc(24px + env(safe-area-inset-top));
+      padding-bottom: calc(24px + env(safe-area-inset-bottom));
+    }
+    .card {
+      background: var(--card);
+      width: 100%;
+      max-width: 420px;
+      border-radius: 18px;
+      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+      padding: 28px 24px;
+    }
+    h1 { font-size: 22px; margin: 0 0 4px; }
+    .subtitle { color: var(--muted); font-size: 14px; margin: 0 0 22px; }
+    .field { margin-bottom: 16px; }
+    label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 6px; }
+    .hint { font-weight: 400; color: var(--muted); font-size: 12px; }
+    input {
+      width: 100%;
+      padding: 12px 14px;
+      font-size: 16px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      outline: none;
+      background: var(--input);
+      color: var(--text);
+      transition: border-color 0.15s, box-shadow 0.15s;
+    }
+    input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.18);
+    }
+    input[type="time"]::-webkit-calendar-picker-indicator,
+    input[type="time"]::-webkit-date-and-time-value { filter: invert(0.8); }
+    .row { display: flex; gap: 14px; }
+    .row .field { flex: 1; }
+    .result {
+      margin-top: 6px;
+      background: var(--money-bg);
+      border: 1px solid var(--money-border);
+      border-radius: 14px;
+      padding: 16px;
+    }
+    .result .line { display: flex; justify-content: space-between; align-items: baseline; padding: 4px 0; }
+    .result .label { color: var(--muted); font-size: 14px; }
+    .result .value { font-size: 20px; font-weight: 700; color: var(--money); }
+    .result .value.big { font-size: 26px; }
+    .error { margin-top: 12px; color: #f87171; font-size: 14px; min-height: 20px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>工资计算</h1>
+    <p class="subtitle">计算实际工时与税前工资</p>
+
+    <div class="row">
+      <div class="field">
+        <label for="start">上班时间</label>
+        <input type="time" id="start" value="11:00">
+      </div>
+      <div class="field">
+        <label for="end">下班时间</label>
+        <input type="time" id="end" value="20:30">
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="breakMin">无薪休息时间 <span class="hint">（分钟）</span></label>
+      <input type="number" id="breakMin" min="0" step="1" value="30" inputmode="numeric">
+    </div>
+
+    <div class="field">
+      <label for="rate">时薪 <span class="hint">（澳元 / 小时）</span></label>
+      <input type="number" id="rate" min="0" step="0.5" value="26.5" inputmode="decimal">
+    </div>
+
+    <div class="result">
+      <div class="line">
+        <span class="label">实际工时</span>
+        <span class="value" id="hoursOut">—</span>
+      </div>
+      <div class="line">
+        <span class="label">税前工资</span>
+        <span class="value big" id="wageOut">—</span>
+      </div>
+    </div>
+
+    <p class="error" id="error"></p>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    function toMinutes(t) { const [h, m] = t.split(':').map(Number); return h * 60 + m; }
+    function calc() {
+      const start = $('start').value, end = $('end').value;
+      const breakMin = parseFloat($('breakMin').value);
+      const rate = parseFloat($('rate').value);
+      const err = $('error'); err.textContent = '';
+      if (!start || !end) { $('hoursOut').textContent = '—'; $('wageOut').textContent = '—'; err.textContent = '请填写上班时间和下班时间。'; return; }
+      if (isNaN(breakMin) || breakMin < 0) { err.textContent = '休息分钟数无效。'; return; }
+      if (isNaN(rate) || rate < 0) { err.textContent = '时薪无效。'; return; }
+      let diff = toMinutes(end) - toMinutes(start);
+      if (diff <= 0) diff += 24 * 60;
+      const workMin = Math.max(0, diff - breakMin);
+      const hours = workMin / 60, wage = hours * rate;
+      $('hoursOut').textContent = hours.toFixed(2) + ' 小时';
+      $('wageOut').textContent = 'A$' + wage.toFixed(2);
+    }
+    ['start', 'end', 'breakMin', 'rate'].forEach(id => $(id).addEventListener('input', calc));
+    calc();
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js'));
+    }
+  </script>
+</body>
+</html>
